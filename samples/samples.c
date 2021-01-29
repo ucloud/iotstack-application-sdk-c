@@ -1,9 +1,17 @@
 #include "app.h"
-
-void recvmsg_handler(char *topic, char *payload)
+#define DEFAULT_TOPIC_FMT "/%s/%s/upload"
+void app_normal_msg_handler(char *topic, char *payload)
 {
     log_write(LOG_INFO, "receive topic:%s",topic);
     log_write(LOG_INFO, "receive payload:%s",payload);
+    return;
+}
+
+void app_rrpc_msg_handler(char *topic, char *payload)
+{
+    log_write(LOG_INFO, "rrpc topic:%s",topic);
+    log_write(LOG_INFO, "rrpc payload:%s",payload);
+    app_rrpc_response(topic, "rrpc response sample!");
     return;
 }
 
@@ -26,7 +34,7 @@ int main(int argc, char **argv)
     log_write(LOG_INFO, "app info:%s",app_get_info());
 
     //注册回调函数
-    status = app_register_cb(recvmsg_handler);
+    status = app_register_cb(app_normal_msg_handler, app_rrpc_msg_handler);
     if(APP_OK != status)
     {
         log_write(LOG_ERROR, "app_register_cb fail");
@@ -40,12 +48,17 @@ int main(int argc, char **argv)
         log_write(LOG_ERROR, "parse app info fail");
         goto end;
     }
+
     /*
         "topic":"/%s/%s/upload"
     */
     cJSON *topic_format = cJSON_GetObjectItem(app_info, "topic");
+    if(topic_format ==  NULL){
+        snprintf(topic_str, 100, DEFAULT_TOPIC_FMT, app_get_productSN(), app_get_deviceSN());
+    }else{
+        snprintf(topic_str, 100, topic_format->valuestring, app_get_productSN(), app_get_deviceSN());
+    }
 
-    snprintf(topic_str, 100, topic_format->valuestring, app_get_productSN(), app_get_deviceSN());
     while(1)
     {    
         sleep(5);

@@ -7,7 +7,10 @@ char *app_name = NULL;
 char *app_productSN = NULL;
 char *app_deviceSN = NULL;
 char *app_info = NULL;
-msg_handler cb = NULL;
+msg_handler normal_cb = NULL;
+msg_handler rrpc_cb   = NULL;
+
+
 char edge_router_subject[NATS_SUBJECT_MAX_LEN] = {0};
 
 app_status nats_subscribe(const char *subject, natsMsgHandler cb, void *cbClosure)
@@ -206,6 +209,16 @@ char *app_get_info()
     return app_info;
 }
 
+static app_status app_rrpc_check(char *topic)
+{
+    if(strstr(topic,"/rrpc/request/") == NULL){
+        return APP_ERR; 
+    }else{
+        return APP_OK;
+    }
+}
+
+
 static void _handle_message(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
 {
     log_write(LOG_DEBUG, "Received msg: %s - %.*s", natsMsg_GetSubject(msg), natsMsg_GetDataLength(msg), natsMsg_GetData(msg));
@@ -244,9 +257,17 @@ static void _handle_message(natsConnection *nc, natsSubscription *sub, natsMsg *
     base64_decode(msg_base64code->valuestring, strlen(msg_base64code->valuestring), msg_base64decode);
     log_write(LOG_DEBUG, "_handle_message msg_base64decode:%s", msg_base64decode);
 
-    if(NULL != cb)
-        cb(topic->valuestring, msg_base64decode);
+    if(NULL != rrpc_cb){
+        if(app_rrpc_check(topic->valuestring) == APP_OK){
+            rrpc_cb(topic->valuestring, msg_base64decode);
+            APP_FREE(msg_base64decode);
+            goto end;
+        }
+    }
 
+    if(NULL != normal_cb){
+        normal_cb(topic->valuestring, msg_base64decode);
+    }
     APP_FREE(msg_base64decode);
 end:
     natsMsg_Destroy(msg);
@@ -254,17 +275,17 @@ end:
     return;
 }
 
-
-app_status app_register_cb(msg_handler handle)
+app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler)
 {
-    app_status status = APP_OK;    
+    app_status status = APP_OK;
     char edge_app_subject[NATS_SUBJECT_MAX_LEN] = {0};
+    if(normal_handler != NULL)
+        normal_cb = normal_handler;
+    rrpc_cb = rrpc_handler;
 
-    if((NULL == cb) && (NULL != handle))
-        cb = handle;
     snprintf(edge_app_subject, NATS_SUBJECT_MAX_LEN, EDGE_APP_SUBJECT_FORMAT, app_get_name());
     log_write(LOG_DEBUG, "edge_app_subject:%s",edge_app_subject);
-    
+
     status = nats_subscribe(edge_app_subject, _handle_message, NULL);
     if(APP_OK != status)
     {
@@ -386,6 +407,20 @@ app_status app_common_init(void)
 
     _fetch_online_status();
 
+    return APP_OK;
+}
+
+app_status app_rrpc_response(char *topic,char *payload)
+{
+    app_status status; 
+    char response_topic[128];
+    replace_str(response_topic, topic, "request", "response");
+    status = app_publish(response_topic, payload);
+    if(APP_OK != status){
+        log_write(LOG_ERROR, "app_publish rrpc fail");
+        return APP_ERR;
+    }
+    log_write(LOG_DEBUG, "app_publish rrpc :%s",payload);
     return APP_OK;
 }
 

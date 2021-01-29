@@ -131,9 +131,12 @@ char *app_get_name();
 char *app_get_productSN();
 char *app_get_deviceSN();
 char *app_get_info();
-app_status app_register_cb(msg_handler handle);
+
+app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler);
 app_status app_publish(const char *topic, const char *str);
 app_status app_common_init(void);
 void log_write(log_level level, const char *format,...);
+app_status app_rrpc_response(char *topic,char *payload);
+
 
 #endif
