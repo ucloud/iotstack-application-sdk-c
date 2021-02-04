@@ -40,7 +40,7 @@ typedef enum
 //payload firmat
 #define NORMAL_MSG_FORMAT                   "{\"src\": \"app\",\"topic\": \"%s\",\"payload\": \"%s\",\"identity\": \"%s\"}"
 #define STATUS_SYNC_FORMAT                  "{\"appName\": \"%s\"}"
-#define LOG_UPLOAD_FORMAT                   "{\"module\": \"application_%s\",\"level\": \"%s\",\"message\": \"%s\",\"timestamp\": %ld}"
+#define LOG_UPLOAD_FORMAT                   "{\"module\": \"app_%s\",\"level\": \"%s\",\"message\": \"%s\",\"timestamp\": %ld}"
 
 #define NATS_MSG_MAX_LEN                    2048
 #define NATS_SUBJECT_MAX_LEN                100
@@ -131,12 +131,10 @@ char *app_get_name();
 char *app_get_productSN();
 char *app_get_deviceSN();
 char *app_get_info();
-
 app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler);
 app_status app_publish(const char *topic, const char *str);
 app_status app_common_init(void);
 void log_write(log_level level, const char *format,...);
 app_status app_rrpc_response(char *topic,char *payload);
-
 
 #endif
