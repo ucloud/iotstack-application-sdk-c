@@ -125,16 +125,17 @@ typedef enum
 
 } app_status;
 
-typedef void (*msg_handler)(char *topic, char *payload);
+typedef void (*msg_handler)(char *topic, char *payload, int payloadLen);
 
 char *app_get_name();
 char *app_get_productSN();
 char *app_get_deviceSN();
 char *app_get_info();
 app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler);
-app_status app_publish(const char *topic, const char *str);
+app_status app_publish(const char *topic, const char *data, int dataLen);
+app_status app_publishString(const char *topic, const char *str);
 app_status app_common_init(void);
 void log_write(log_level level, const char *format,...);
-app_status app_rrpc_response(char *topic,char *payload);
+app_status app_rrpc_response(char *topic,char *payload, int payloadLen);
 
 #endif
