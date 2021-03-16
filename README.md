@@ -73,10 +73,36 @@ char *app_get_info(void)
  *
  * @param handle: 下行消息回调函数指针           
  *
+ * @param handle: rrpc消息回调函数指针           
+ *
  * @retval : 成功则返回APP_OK
  */
  
-app_status app_register_cb(msg_handler handle)
+app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler)
+
+/**
+ * @brief 发送消息，可发送二进制流
+ *
+ * @param topic: topic名字         
+ *
+ * @param data: 发送数据内容 
+ *
+ * @param dataLen: 发送数据长度
+ *
+ * @retval : 成功则返回APP_OK
+ */
+app_status app_publish(const char *topic, const char *data, int dataLen)
+
+/**
+ * @brief 发送字符串消息
+ *
+ * @param topic: topic名字         
+ *
+ * @param data: 发送字符串内容
+ *
+ * @retval : 成功则返回APP_OK
+ */
+app_status app_publishString(const char *topic, const char *data)
 
 /**
  * @brief 记录日志
