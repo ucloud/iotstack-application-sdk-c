@@ -1,17 +1,18 @@
 #include "app.h"
 #define DEFAULT_TOPIC_FMT "/%s/%s/upload"
-void app_normal_msg_handler(char *topic, char *payload)
+void app_normal_msg_handler(char *topic, char *payload, int payloadLen)
 {
     log_write(LOG_INFO, "receive topic:%s",topic);
-    log_write(LOG_INFO, "receive payload:%s",payload);
+    log_write(LOG_INFO, "receive payload:%s payloadLen:%d",payload, payloadLen);
     return;
 }
 
-void app_rrpc_msg_handler(char *topic, char *payload)
+void app_rrpc_msg_handler(char *topic, char *payload, int payloadLen)
 {
     log_write(LOG_INFO, "rrpc topic:%s",topic);
-    log_write(LOG_INFO, "rrpc payload:%s",payload);
-    app_rrpc_response(topic, "rrpc response sample!");
+    log_write(LOG_INFO, "rrpc payload:%s payloadLen:%d",payload, payloadLen);
+    char *response_str = "rrpc response sample!";
+    app_rrpc_response(topic, response_str, strlen(response_str));
     return;
 }
 
@@ -67,7 +68,8 @@ int main(int argc, char **argv)
         snprintf(time_stamp, 100, "{\"timestamp\": \"%ld\"}", stamp.tv_sec);
         log_write(LOG_INFO, "send message[%s]", time_stamp);
         
-        status = app_publish(topic_str, time_stamp);
+        status = app_publishString(topic_str, time_stamp);
+        status |= app_publish(topic_str, "0D0A2131", 8);
         if(APP_OK != status)
         {
             log_write(LOG_ERROR, "app_publish fail");

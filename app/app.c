@@ -254,19 +254,19 @@ static void _handle_message(natsConnection *nc, natsSubscription *sub, natsMsg *
         goto end;
     }
     memset(msg_base64decode, 0, NATS_MSG_MAX_LEN);
-    base64_decode(msg_base64code->valuestring, strlen(msg_base64code->valuestring), msg_base64decode);
+    int msg_base64decodeLen = base64_decode(msg_base64code->valuestring, strlen(msg_base64code->valuestring), msg_base64decode);
     log_write(LOG_DEBUG, "_handle_message msg_base64decode:%s", msg_base64decode);
 
     if(NULL != rrpc_cb){
         if(app_rrpc_check(topic->valuestring) == APP_OK){
-            rrpc_cb(topic->valuestring, msg_base64decode);
+            rrpc_cb(topic->valuestring, msg_base64decode, msg_base64decodeLen);
             APP_FREE(msg_base64decode);
             goto end;
         }
     }
 
     if(NULL != normal_cb){
-        normal_cb(topic->valuestring, msg_base64decode);
+        normal_cb(topic->valuestring, msg_base64decode, msg_base64decodeLen);
     }
     APP_FREE(msg_base64decode);
 end:
@@ -295,11 +295,11 @@ app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler)
     return status;
 }
 
-app_status app_publish(const char *topic, const char *str)
+app_status app_publish(const char *topic, const char *data, int dataLen)
 {
     app_status status = APP_OK;
 
-    if((NULL == topic) || (NULL == str))
+    if((NULL == topic) || (NULL == data))
     {
         return APP_INVALID_ARG;
     }
@@ -311,8 +311,8 @@ app_status app_publish(const char *topic, const char *str)
         return APP_NO_MEMORY;
     }
     memset(normal_payload_base64, 0, NATS_MSG_MAX_LEN);
-    base64_encode(str, strlen(str), normal_payload_base64);
-    log_write(LOG_DEBUG, "dyn_reg_payload_base64:%s",normal_payload_base64);
+    base64_encode(data, dataLen, normal_payload_base64);
+    log_write(LOG_DEBUG, "send data:%s",data);
 
     char *normal_msg = (char *)APP_MALLOC(NATS_MSG_MAX_LEN);
     if(NULL == normal_msg)
@@ -323,7 +323,6 @@ app_status app_publish(const char *topic, const char *str)
     }
     memset(normal_msg, 0, NATS_MSG_MAX_LEN);
     snprintf(normal_msg, NATS_MSG_MAX_LEN, NORMAL_MSG_FORMAT, topic, normal_payload_base64, app_get_name());
-    log_write(LOG_DEBUG, "normal_msg:%s",normal_msg);
 
     status = nats_publish(edge_router_subject, normal_msg);
     
@@ -331,6 +330,16 @@ app_status app_publish(const char *topic, const char *str)
     APP_FREE(normal_msg);
     return status;
 }
+
+app_status app_publishString(const char *topic, const char *str)
+{
+    app_status status;
+
+    status = app_publish(topic,str,strlen(str));
+
+    return status;
+}
+
 
 static void _handle_status_sync(union sigval v)
 {
@@ -410,12 +419,12 @@ app_status app_common_init(void)
     return APP_OK;
 }
 
-app_status app_rrpc_response(char *topic,char *payload)
+app_status app_rrpc_response(char *topic,char *payload, int payloadLen)
 {
     app_status status; 
     char response_topic[128];
     replace_str(response_topic, topic, "request", "response");
-    status = app_publish(response_topic, payload);
+    status = app_publish(response_topic, payload, payloadLen);
     if(APP_OK != status){
         log_write(LOG_ERROR, "app_publish rrpc fail");
         return APP_ERR;
