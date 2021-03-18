@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     if(APP_OK != status)
     {
         log_write(LOG_ERROR, "app_common_init fail");
-        goto end;
+        return APP_ERR;
     }
 
     log_write(LOG_INFO, "productSN:%s, deviceSN:%s",app_get_productSN(),app_get_deviceSN());
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     if(APP_OK != status)
     {
         log_write(LOG_ERROR, "app_register_cb fail");
-        goto end;
+        return APP_ERR;
     }
 
     //获取应用配置信息
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     if (!app_info) 
     {
         log_write(LOG_ERROR, "parse app info fail");
-        goto end;
+        return APP_ERR;
     }
 
     /*
