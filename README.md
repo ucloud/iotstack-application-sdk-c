@@ -71,14 +71,16 @@ char *app_get_info(void)
 /**
  * @brief 注册下行消息回调函数
  *
- * @param handle: 下行消息回调函数指针           
+ * @param normal_handler: 下行消息回调函数指针           
  *
- * @param handle: rrpc消息回调函数指针           
+ * @param rrpc_handler: rrpc消息回调函数指针           
+ *
+ * @param nats_msg_handle: nats消息回调函数指针           
  *
  * @retval : 成功则返回APP_OK
  */
  
-app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler)
+app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler, msg_handler nats_msg_handle)
 
 /**
  * @brief 发送消息，可发送二进制流
@@ -103,6 +105,28 @@ app_status app_publish(const char *topic, const char *data, int dataLen)
  * @retval : 成功则返回APP_OK
  */
 app_status app_publishString(const char *topic, const char *data)
+
+/**
+ * @brief  订阅nats subject
+ *
+ * @param subject: nats subject名称         
+ *
+ * @retval : 成功则返回APP_OK
+ */
+app_status nats_subscribe(const char *subject)
+
+/**
+ * @brief 向nats subject发送消息
+ *
+ * @param subject: nats subject名称
+ *
+ * @param data: 发送内容
+ *
+ * @param dataLen: 发送内容长度
+ *
+ * @retval : 成功则返回APP_OK
+ */
+app_status nats_publish(const char *subject, const char *data, int dataLen)
 
 /**
  * @brief 记录日志

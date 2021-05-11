@@ -16,6 +16,12 @@ void app_rrpc_msg_handler(char *topic, char *payload, int payloadLen)
     return;
 }
 
+void app_nats_msg_handler_user(char *topic, char *payload, int payloadLen)
+{
+    log_write(LOG_INFO, "topic:%s payload:%s payloadLen:%d", topic, payload, payloadLen);
+    return;
+}
+
 int main(int argc, char **argv)
 {
     app_status status = APP_OK;    
@@ -35,7 +41,7 @@ int main(int argc, char **argv)
     log_write(LOG_INFO, "app info:%s",app_get_info());
 
     //注册回调函数
-    status = app_register_cb(app_normal_msg_handler, app_rrpc_msg_handler);
+    status = app_register_cb(app_normal_msg_handler, app_rrpc_msg_handler, app_nats_msg_handler_user);
     if(APP_OK != status)
     {
         log_write(LOG_ERROR, "app_register_cb fail");
@@ -60,6 +66,14 @@ int main(int argc, char **argv)
         snprintf(topic_str, 100, topic_format->valuestring, app_get_productSN(), app_get_deviceSN());
     }
 
+    //subscribe nats subject
+    status = nats_subscribe("/a/b/c");
+    if(APP_OK != status)
+    {
+        log_write(LOG_ERROR, "nats_subscribe nats subject fail");
+        return APP_ERR;
+    }
+
     while(1)
     {    
         sleep(5);
@@ -73,6 +87,13 @@ int main(int argc, char **argv)
         if(APP_OK != status)
         {
             log_write(LOG_ERROR, "app_publish fail");
+            goto end;
+        }
+        //publish msg to subscribed nats subject
+        status = nats_publish("/a/b/c",time_stamp,strlen(time_stamp));
+        if(APP_OK != status)
+        {
+            log_write(LOG_ERROR, "edge_publish nats subject fail");
             goto end;
         }
     }

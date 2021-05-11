@@ -9,11 +9,12 @@ char *app_deviceSN = NULL;
 char *app_info = NULL;
 msg_handler normal_cb = NULL;
 msg_handler rrpc_cb   = NULL;
+msg_handler app_nats_msg_handle = NULL;
 
 
 char edge_router_subject[NATS_SUBJECT_MAX_LEN] = {0};
 
-app_status nats_subscribe(const char *subject, natsMsgHandler cb, void *cbClosure)
+app_status _nats_subscribe(const char *subject, natsMsgHandler cb, void *cbClosure)
 {
     app_status status = APP_OK;    
     
@@ -22,11 +23,11 @@ app_status nats_subscribe(const char *subject, natsMsgHandler cb, void *cbClosur
     return status;
 }
 
-app_status nats_publish(const char *topic, const char *str)
+app_status _nats_publish(const char *subject, const char *str)
 {
     app_status status = APP_OK;
 
-    natsConnection_PublishString(conn, topic, str);
+    natsConnection_PublishString(conn, subject, str);
     natsConnection_Flush(conn);
 
     return status;
@@ -87,7 +88,7 @@ void log_write(log_level level, const char *format,...)
     replace_str(msg_str_rep, msg_str, "\"", "\\\"");
     snprintf(log_msg, NATS_MSG_MAX_LEN, LOG_UPLOAD_FORMAT, app_get_name(), log_lev[level], msg_str_rep, stamp.tv_sec);
     
-    nats_publish(EDGE_LOG_UPLOAD_SUBJECT, log_msg);
+    _nats_publish(EDGE_LOG_UPLOAD_SUBJECT, log_msg);
 
     APP_FREE(msg_str_rep);
     APP_FREE(msg_str);
@@ -275,18 +276,43 @@ end:
     return;
 }
 
-app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler)
+static void _on_nats_message(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure)
+{
+    log_write(LOG_DEBUG, "Received local msg: %s - %.*s", natsMsg_GetSubject(msg), natsMsg_GetDataLength(msg), natsMsg_GetData(msg));
+    
+    char *msg_base64decode = (char *)APP_MALLOC(NATS_MSG_MAX_LEN);
+    if(NULL == msg_base64decode)
+    {
+        log_write(LOG_ERROR, "msg_base64decode malloc fail!");
+        return;
+    }
+    memset(msg_base64decode, 0, NATS_MSG_MAX_LEN);
+    int msg_base64decodeLen = base64_decode(natsMsg_GetData(msg), natsMsg_GetDataLength(msg), msg_base64decode);
+    log_write(LOG_DEBUG, "_on_local_message msg_base64decode:%s", msg_base64decode);
+
+    if(app_nats_msg_handle)
+        app_nats_msg_handle((char *)natsMsg_GetSubject(msg), msg_base64decode, msg_base64decodeLen);
+
+    APP_FREE(msg_base64decode);     
+    return;
+}
+
+
+app_status app_register_cb(msg_handler normal_handler, msg_handler rrpc_handler, msg_handler nats_msg_handle)
 {
     app_status status = APP_OK;
     char edge_app_subject[NATS_SUBJECT_MAX_LEN] = {0};
     if(normal_handler != NULL)
         normal_cb = normal_handler;
-    rrpc_cb = rrpc_handler;
+    if(rrpc_handler != NULL)
+        rrpc_cb = rrpc_handler;
+    if(nats_msg_handle != NULL)
+        app_nats_msg_handle = nats_msg_handle;
 
     snprintf(edge_app_subject, NATS_SUBJECT_MAX_LEN, EDGE_APP_SUBJECT_FORMAT, app_get_name());
     log_write(LOG_DEBUG, "edge_app_subject:%s",edge_app_subject);
 
-    status = nats_subscribe(edge_app_subject, _handle_message, NULL);
+    status = _nats_subscribe(edge_app_subject, _handle_message, NULL);
     if(APP_OK != status)
     {
         log_write(LOG_ERROR, "edge_subscribe %s fail! status:%d", edge_app_subject, status);
@@ -324,7 +350,7 @@ app_status app_publish(const char *topic, const char *data, int dataLen)
     memset(normal_msg, 0, NATS_MSG_MAX_LEN);
     snprintf(normal_msg, NATS_MSG_MAX_LEN, NORMAL_MSG_FORMAT, topic, normal_payload_base64, app_get_name());
 
-    status = nats_publish(edge_router_subject, normal_msg);
+    status = _nats_publish(edge_router_subject, normal_msg);
     
     APP_FREE(normal_payload_base64);    
     APP_FREE(normal_msg);
@@ -354,7 +380,7 @@ static void _handle_status_sync(union sigval v)
     memset(sync_msg, 0, NATS_MSG_MAX_LEN);
     snprintf(sync_msg, NATS_MSG_MAX_LEN, STATUS_SYNC_FORMAT, app_get_name());
     log_write(LOG_DEBUG, "sync_msg:%s",sync_msg);
-    status = nats_publish(EDGE_APP_STATUS_SUBJECT, sync_msg);
+    status = _nats_publish(EDGE_APP_STATUS_SUBJECT, sync_msg);
     if(APP_OK != status)
     {
         log_write(LOG_ERROR, "publish sync msg fail!");
@@ -433,8 +459,29 @@ app_status app_rrpc_response(char *topic,char *payload, int payloadLen)
     return APP_OK;
 }
 
+app_status nats_subscribe(const char *subject)
+{
+    app_status status;    
+    
+    status = _nats_subscribe(subject, _on_nats_message, NULL);
+    return status;
+}
 
+app_status nats_publish(const char *subject, const char *data, int dataLen)
+{
+    app_status status;
 
+    char *normal_payload_base64 = (char *)APP_MALLOC(NATS_MSG_MAX_LEN);
+    if(NULL == normal_payload_base64)
+    {
+        log_write(LOG_ERROR, "normal_payload_base64 malloc fail!");
+        return APP_NO_MEMORY;
+    }
+    memset(normal_payload_base64, 0, NATS_MSG_MAX_LEN);
+    base64_encode(data, dataLen, normal_payload_base64);
 
+    status = _nats_publish(subject, normal_payload_base64);
 
+    return status;
+}
 
